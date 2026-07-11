@@ -11,7 +11,7 @@ from sklearn.ensemble import RandomForestRegressor
 # 忽略警告
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# --- 1. 資料處理 (自動定位當前路徑) ---
+# --- 1. 資料處理 ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(current_dir, 'tea_data0714無味道優化.xlsx')
 df = pd.read_excel(file_path)
@@ -110,4 +110,6 @@ with gr.Blocks(css=custom_css) as demo:
     btn.click(suggest_process, inputs=[input_wanted, input_excluded], outputs=[main_area, result_area, out_ratio, out_pressure, out_additive])
 
 if __name__ == "__main__":
-    demo.launch()
+    # Render 強制執行設定
+    port = int(os.environ.get("PORT", 7860))
+    demo.launch(server_name="0.0.0.0", server_port=port)
