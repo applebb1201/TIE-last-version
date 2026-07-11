@@ -8,22 +8,23 @@ import os
 from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
 
-# --- 設定路徑 ---
-# 自動獲取程式碼所在目錄，確保雲端也能讀到檔案
+# --- 1. 設定檔案路徑 ---
+# 自動抓取程式所在目錄，確保雲端執行時能找到檔案
 BASE_DIR = Path(__file__).resolve().parent
 file_path = BASE_DIR / 'tea_data0714無味道優化.xlsx'
 img_path = BASE_DIR / "tea_bg.jpg"
 
-# --- 1. 資料處理 ---
+# --- 2. 資料處理 (模型訓練) ---
 df = pd.read_excel(file_path)
 df.columns = df.columns.str.strip()
 
 aromas = ['甜香', '蜜糖香', '焦糖香', '花香', '熟果香', '原木香', '烤焙香', '青草味']
 existing_columns = [col for col in aromas if col in df.columns]
+
 model = RandomForestRegressor(n_estimators=100, random_state=42)
 model.fit(df[existing_columns], df[['固液比', '壓力']])
 
-# --- 2. 圖片處理 ---
+# --- 3. 圖片處理 (轉換為 Base64) ---
 def get_image_base64(path):
     try:
         with open(path, "rb") as image_file:
@@ -34,13 +35,31 @@ def get_image_base64(path):
 
 base64_bg = get_image_base64(img_path)
 
-# --- 3. 美學 CSS (維持不變) ---
+# --- 4. 美學 CSS ---
+# 改用系統強勢字體，避開外部網路載入失敗問題
 custom_css = f"""
-.gradio-container {{ background: url('{base64_bg}') no-repeat center center fixed !important; background-size: cover !important; font-family: sans-serif !important; }}
-.glass-panel {{ background: rgba(255, 255, 255, 0.85) !important; backdrop-filter: blur(25px) !important; border-radius: 40px !important; padding: 50px !important; }}
+.gradio-container {{ 
+    background: url('{base64_bg}') no-repeat center center fixed !important; 
+    background-size: cover !important; 
+    font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif !important; 
+    font-weight: 900 !important; 
+}}
+
+.glass-panel {{ 
+    background: rgba(255, 255, 255, 0.85) !important; 
+    backdrop-filter: blur(25px) !important; 
+    border-radius: 40px !important; 
+    padding: 50px !important; 
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3) !important; 
+}}
+
+label, span, p, h1, h2, button {{ 
+    color: #000000 !important; 
+    font-weight: 900 !important; 
+}}
 """
 
-# --- 4. 邏輯函數 ---
+# --- 5. 核心邏輯函數 ---
 def suggest_process(selected_aromas, excluded_aromas):
     time.sleep(0.5)
     input_vector = pd.DataFrame(0, index=[0], columns=existing_columns)
@@ -51,15 +70,17 @@ def suggest_process(selected_aromas, excluded_aromas):
     pred = model.predict(input_vector)[0]
     return gr.update(visible=False), gr.update(visible=True), f"{np.clip(pred[0], 0.1111, 0.1429):.4f}", f"{np.clip(pred[1], 0.133, 0.260):.3f} bar", f"{random.randint(1, 5)}%"
 
-# --- 5. 介面 ---
+# --- 6. Gradio 介面 ---
 with gr.Blocks(css=custom_css) as demo:
     with gr.Column(elem_classes="glass-panel"):
+        # 互動區塊
         with gr.Column(visible=True) as main_area:
             gr.Markdown("# 🍃 茶香 AI 製程優化系統")
             input_wanted = gr.CheckboxGroup(aromas, label="✨ 想要增強的香氣")
             input_excluded = gr.CheckboxGroup(aromas, label="🚫 想要避開的香氣")
             btn = gr.Button("開始計算建議製程")
 
+        # 結果區塊
         with gr.Column(visible=False) as result_area:
             gr.Markdown("## 📋 建議製程參數")
             out_ratio = gr.Textbox(label="建議固液比")
@@ -70,7 +91,8 @@ with gr.Blocks(css=custom_css) as demo:
 
     btn.click(suggest_process, inputs=[input_wanted, input_excluded], outputs=[main_area, result_area, out_ratio, out_pressure, out_additive])
 
-# --- 關鍵修改：讓雲端平台指定連接埠 ---
+# --- 7. 程式入口 ---
 if __name__ == "__main__":
+    # Railway 會自動分配 PORT，必須使用環境變數
     port = int(os.environ.get("PORT", 7860))
     demo.launch(server_name="0.0.0.0", server_port=port)
