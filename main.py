@@ -8,13 +8,12 @@ import os
 from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
 
-# --- 1. 設定檔案路徑 ---
-# 自動抓取程式所在目錄，確保雲端執行時能找到檔案
+# --- 1. 設定檔案路徑 (自動偵測雲端環境) ---
 BASE_DIR = Path(__file__).resolve().parent
 file_path = BASE_DIR / 'tea_data0714無味道優化.xlsx'
 img_path = BASE_DIR / "tea_bg.jpg"
 
-# --- 2. 資料處理 (模型訓練) ---
+# --- 2. 資料處理 ---
 df = pd.read_excel(file_path)
 df.columns = df.columns.str.strip()
 
@@ -35,16 +34,31 @@ def get_image_base64(path):
 
 base64_bg = get_image_base64(img_path)
 
-# --- 4. 美學 CSS ---
-# 改用系統強勢字體，避開外部網路載入失敗問題
+# --- 4. 強制美學 CSS (全面覆蓋 Gradio 預設樣式) ---
 custom_css = f"""
+/* 確保頁面背景與字體基礎設定 */
 .gradio-container {{ 
     background: url('{base64_bg}') no-repeat center center fixed !important; 
     background-size: cover !important; 
     font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif !important; 
-    font-weight: 900 !important; 
 }}
 
+/* 暴力覆蓋所有 Gradio 元件樣式，確保字體粗體且黑色 */
+.gradio-container label, 
+.gradio-container span, 
+.gradio-container p, 
+.gradio-container h1, 
+.gradio-container h2, 
+.gradio-container button, 
+.gradio-container input,
+.gradio-container .gr-button,
+.gradio-container .gr-checkbox-group span {{ 
+    font-family: 'Microsoft JhengHei', 'PingFang TC', sans-serif !important;
+    font-weight: 900 !important;
+    color: #000000 !important;
+}}
+
+/* 調整玻璃面板樣式 */
 .glass-panel {{ 
     background: rgba(255, 255, 255, 0.85) !important; 
     backdrop-filter: blur(25px) !important; 
@@ -53,9 +67,11 @@ custom_css = f"""
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3) !important; 
 }}
 
-label, span, p, h1, h2, button {{ 
-    color: #000000 !important; 
-    font-weight: 900 !important; 
+/* 按鈕美化 */
+button {{ 
+    background: #000000 !important; 
+    color: #ffffff !important; 
+    font-weight: 900 !important;
 }}
 """
 
@@ -73,14 +89,12 @@ def suggest_process(selected_aromas, excluded_aromas):
 # --- 6. Gradio 介面 ---
 with gr.Blocks(css=custom_css) as demo:
     with gr.Column(elem_classes="glass-panel"):
-        # 互動區塊
         with gr.Column(visible=True) as main_area:
             gr.Markdown("# 🍃 茶香 AI 製程優化系統")
             input_wanted = gr.CheckboxGroup(aromas, label="✨ 想要增強的香氣")
             input_excluded = gr.CheckboxGroup(aromas, label="🚫 想要避開的香氣")
             btn = gr.Button("開始計算建議製程")
 
-        # 結果區塊
         with gr.Column(visible=False) as result_area:
             gr.Markdown("## 📋 建議製程參數")
             out_ratio = gr.Textbox(label="建議固液比")
@@ -93,6 +107,5 @@ with gr.Blocks(css=custom_css) as demo:
 
 # --- 7. 程式入口 ---
 if __name__ == "__main__":
-    # Railway 會自動分配 PORT，必須使用環境變數
     port = int(os.environ.get("PORT", 7860))
     demo.launch(server_name="0.0.0.0", server_port=port)
